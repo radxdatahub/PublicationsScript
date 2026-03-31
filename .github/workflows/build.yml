@@ -1,0 +1,51 @@
+name: Build Branch or PR
+
+on:
+  pull_request:
+    branches: [ development, release, main ]
+    types: [opened, reopened]
+  push:
+    branches-ignore: [ development, release, main ]
+
+env:
+  ENVIRONMENT: dev
+  AWS_REGION: us-east-2
+  ECR_REPOSITORY: radx-publicationscript
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set env to test
+        if: endsWith(github.ref, '/release')
+        run: |
+          echo "ENVIRONMENT=test" >> $GITHUB_ENV
+          echo "AWS_REGION=us-east-1" >> $GITHUB_ENV
+
+      - name: Set env to production
+        if: endsWith(github.ref, '/main')
+        run: |
+          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+          echo "AWS_REGION=us-west-2" >> $GITHUB_ENV
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build Docker image 
+        id: build-image 
+        run: |
+            # Build a docker container and
+            # push it to ECR so that it can
+            # be deployed to ECS.
+            docker build -t $ECR_REPOSITORY/$ENVIRONMENT:latest .
